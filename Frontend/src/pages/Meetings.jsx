@@ -12,7 +12,7 @@ const Meetings = () => {
   const [activeTab, setActiveTab] = useState('Upcoming');
 
   return (
-    <div className="p-4 md:p-8 w-full max-w-6xl">
+    <div className="p-4 md:p-8 w-full ">
        {/* Header */}
        <div className="flex items-center gap-2 mb-8">
           <h1 className="text-3xl font-bold text-gray-800">Meetings</h1>

@@ -155,8 +155,8 @@ const Scheduling = () => {
   };
 
   return (
-    <div className="flex h-full relative">
-      <Toaster position="top-right" />
+    <div className="flex h-full relative ">
+      <Toaster position="top-center" />
       {/* Main Content Area */}
       <div className={`flex-1 p-4 md:p-8 transition-all duration-300 ${isModalOpen ? 'mr-0' : 'w-full'}`}>
       

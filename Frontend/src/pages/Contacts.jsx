@@ -8,7 +8,7 @@ import {
 
 const Contacts = () => {
   return (
-      <div className="p-4 md:p-8 w-full max-w-6xl">
+      <div className="p-4 md:p-8 w-full ">
         {/* Header */}
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
             <h1 className="text-3xl font-bold text-gray-800">Contacts</h1>

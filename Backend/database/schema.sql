@@ -2,9 +2,19 @@ DROP TABLE IF EXISTS bookings;
 DROP TABLE IF EXISTS date_overrides;
 DROP TABLE IF EXISTS availability_slots;
 DROP TABLE IF EXISTS event_types;
+DROP TABLE IF EXISTS schedules;
+
+CREATE TABLE schedules (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  name VARCHAR(255) NOT NULL DEFAULT 'Working Hours',
+  timezone VARCHAR(50) DEFAULT 'UTC',
+  is_default BOOLEAN DEFAULT FALSE,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
 
 CREATE TABLE event_types (
   id INT AUTO_INCREMENT PRIMARY KEY,
+  schedule_id INT,
   title VARCHAR(255) NOT NULL,
   slug VARCHAR(255) NOT NULL UNIQUE,
   description TEXT,
@@ -17,28 +27,34 @@ CREATE TABLE event_types (
   buffer_before INT DEFAULT 0,
   buffer_after INT DEFAULT 0,
   is_active BOOLEAN DEFAULT TRUE,
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (schedule_id) REFERENCES schedules(id) ON DELETE SET NULL
 );
 
 CREATE TABLE availability_slots (
   id INT AUTO_INCREMENT PRIMARY KEY,
-  event_type_id INT NOT NULL,
+  event_type_id INT,
+  schedule_id INT,
   day_of_week ENUM('Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday') NOT NULL,
   start_time TIME NOT NULL,
   end_time TIME NOT NULL,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  FOREIGN KEY (event_type_id) REFERENCES event_types(id) ON DELETE CASCADE
+  FOREIGN KEY (event_type_id) REFERENCES event_types(id) ON DELETE CASCADE,
+  FOREIGN KEY (schedule_id) REFERENCES schedules(id) ON DELETE CASCADE,
+  CHECK (event_type_id IS NOT NULL OR schedule_id IS NOT NULL)
 );
 
 CREATE TABLE date_overrides (
   id INT AUTO_INCREMENT PRIMARY KEY,
-  event_type_id INT NOT NULL,
+  event_type_id INT,
+  schedule_id INT,
   override_date DATE NOT NULL,
   start_time TIME NOT NULL,
   end_time TIME NOT NULL,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (event_type_id) REFERENCES event_types(id) ON DELETE CASCADE,
-  UNIQUE(event_type_id, override_date, start_time, end_time)
+  FOREIGN KEY (schedule_id) REFERENCES schedules(id) ON DELETE CASCADE,
+  CHECK (event_type_id IS NOT NULL OR schedule_id IS NOT NULL)
 );
 
 CREATE TABLE bookings (

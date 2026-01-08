@@ -1,5 +1,15 @@
 -- Seed Data
 
+INSERT INTO schedules (name, is_default, timezone) VALUES ('Working Hours', TRUE, 'UTC');
+SET @schedule_id_1 = LAST_INSERT_ID();
+
+INSERT INTO availability_slots (schedule_id, day_of_week, start_time, end_time) VALUES
+(@schedule_id_1, 'Monday', '09:00:00', '17:00:00'),
+(@schedule_id_1, 'Tuesday', '09:00:00', '17:00:00'),
+(@schedule_id_1, 'Wednesday', '09:00:00', '17:00:00'),
+(@schedule_id_1, 'Thursday', '09:00:00', '17:00:00'),
+(@schedule_id_1, 'Friday', '09:00:00', '17:00:00');
+
 INSERT INTO event_types (title, slug, description, duration, location, host_name, host_email, buffer_before, buffer_after) 
 VALUES ('15 Min Quick Chat', '15-min-chat', 'A short catch-up call.', 15, 'meet', 'Ayush', 'ayush@example.com', 5, 5);
 
