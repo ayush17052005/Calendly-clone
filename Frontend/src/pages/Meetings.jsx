@@ -91,16 +91,25 @@ const Meetings = () => {
       
       const toDate = (dateStr) => {
           if (!dateStr) return new Date();
-          // If input is 'YYYY-MM-DD HH:mm:ss', treat it as local time (or "floating" time)
-          const isoLike = dateStr.replace(' ', 'T');
-          return new Date(isoLike);
+          // Assume the backend string "YYYY-MM-DD HH:mm:ss" is strictly UTC
+          // We append 'Z' to force the browser to treat it as UTC
+          const utcString = dateStr.replace(' ', 'T') + (dateStr.endsWith('Z') ? '' : 'Z');
+          return new Date(utcString);
       };
 
       const s = toDate(start);
       const e = toDate(end);
       
-      return `${s.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })} – ${e.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}`;
+      // Now 's' and 'e' are Date objects that represent that exact point in time.
+      // e.g. if DB has 14:00:00, 's' is 14:00:00 UTC.
+      
+      // To Display in UTC (User Requirement):
+      // We use .getUTCHours() etc. OR toLocaleString with timeZone: 'UTC'
+      
+      return `${s.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true, timeZone: 'UTC' })} - ` +
+             `${e.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true, timeZone: 'UTC' })}`;
   };
+   ;
 
   return (
     <div className="p-4 md:p-8 w-full mx-auto">

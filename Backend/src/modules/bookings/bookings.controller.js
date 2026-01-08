@@ -33,19 +33,15 @@ exports.createBooking = asyncHandler(async (req, res) => {
         throw new NotFoundError('Event Type not found');
     }
 
-    // Treat the incoming string as UTC to preserve face value (avoid local timezone shift)
-    // Ensures "2026-01-09 09:30:00" stays "2026-01-09 09:30:00" in DB
-    const timeStr = start_time.includes('T') ? start_time : start_time.replace(' ', 'T');
-    // If user sends local time string 'YYYY-MM-DD HH:mm:ss' but we want to treat it as a UTC point in time:
-    // We append Z. 
-    // BUT if the frontend sends "2026-01-20 14:00:00" (Local), appending Z makes it 14:00 UTC.
-    // If user meant 14:00 Local (IST), that is 08:30 UTC.
-    // However, the issue is likely that we want to store *exactly what the user sent*?
-    // No, standard is usually UTC.
-    // If frontend sends '2026-01-20 14:00:00' (implied local), and we treat it as UTC, we shift it by timezone offset twice if we aren't careful.
     
-    // Let's rely on standard parsing.
+    let timeStr = start_time.includes('T') ? start_time : start_time.replace(' ', 'T');
+    if (!timeStr.endsWith('Z')) {
+        timeStr += 'Z';
+    }
+   
+    
     const start = new Date(timeStr);
+    console.log('Parsed start time as UTC:', start," ",timeStr);
     
     // Add duration (in minutes)
     const end = new Date(start.getTime() + eventType.duration * 60000);
