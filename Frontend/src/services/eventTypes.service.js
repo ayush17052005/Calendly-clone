@@ -11,13 +11,21 @@ const eventTypesService = {
   // Get a single event type by ID
   getEventTypeById: async (id) => {
     const response = await api.get(`/event-types/${id}`);
-    return response.data;
+    return response.data?.data?.eventType;
+  },
+
+  getEventTypeBySlug: async (slug) => {
+    const response = await api.get(`/event-types/public/${slug}`);
+    return response.data?.data?.eventType;
   },
 
   // Get slots for a specific event type
   getEventSlots: async (id, date, timezone) => {
     const response = await api.get(`/event-types/${id}/slots`, {
       params: { date, timezone },
+    });
+    return response.data?.data?.slots || [];
+  },
     });
     return response.data;
   },

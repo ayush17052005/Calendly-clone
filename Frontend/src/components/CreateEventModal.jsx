@@ -12,14 +12,17 @@ import {
   Video,
   Phone,
   MapPin as MapPinIcon,
-  Globe
+  Globe,
+  Check
 } from 'lucide-react';
 import toast, { Toaster } from 'react-hot-toast';
 import eventTypesService from '../services/eventTypes.service';
+import scheduleService from '../services/schedule.service';
 
 const CreateEventModal = ({ isOpen, onClose, isModal = true, onEventCreate, initialData = null }) => {
   const [title, setTitle] = useState('New Meeting');
   const [slug, setSlug] = useState('');
+  const [isSlugEdited, setIsSlugEdited] = useState(false);
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   
@@ -29,71 +32,160 @@ const CreateEventModal = ({ isOpen, onClose, isModal = true, onEventCreate, init
   const [duration, setDuration] = useState('30');
   const [customDuration, setCustomDuration] = useState('');
   const [locationType, setLocationType] = useState('');
-  const [scheduleType, setScheduleType] = useState('working_hours');
+  
+  // Schedule State
+  const [schedules, setSchedules] = useState([]);
+  const [selectedScheduleId, setSelectedScheduleId] = useState(null);
+  const [scheduleDetail, setScheduleDetail] = useState(null);
   
   // Host State
   const [hostName, setHostName] = useState('Ayush Saha');
   const [hostEmail, setHostEmail] = useState(''); 
   const [isEditingHost, setIsEditingHost] = useState(false);
+  const [accentColor, setAccentColor] = useState('#8b5cf6'); // Default purple
+  const [showColorPicker, setShowColorPicker] = useState(false);
+
+  const PRESET_COLORS = [
+    '#EF4444', // Red
+    '#F97316', // Orange
+    '#F59E0B', // Amber
+    '#10B981', // Emerald
+    '#06B6D4', // Cyan
+    '#3B82F6', // Blue
+    '#6366F1', // Indigo
+    '#8B5CF6', // Violet (Default)
+    '#EC4899', // Pink
+    '#64748B'  // Slate
+  ];
 
   // Initialize form when initialData changes
   useEffect(() => {
-    if (initialData) {
-        setTitle(initialData.title || 'New Meeting');
-        setSlug(initialData.slug || '');
-        setDuration(initialData.duration?.toString() || '30');
-        setLocationType(initialData.location || '');
-        setHostName(initialData.host_name || 'Ayush Saha');
-        setHostEmail(initialData.host_email || '');
-    } else {
-        // Reset defaults if no initialData (Creation Mode)
-        setTitle('New Meeting');
-        setSlug('');
-        setDuration('30');
-        setLocationType('');
-        setHostName('Ayush Saha');
-        setHostEmail('');
-    }
+    const loadInit = async () => {
+        if (initialData) {
+            setTitle(initialData.title || 'New Meeting');
+            setSlug(initialData.slug || '');
+            setIsSlugEdited(!!initialData.slug);
+            setDuration(initialData.duration?.toString() || '30');
+            setLocationType(initialData.location || '');
+            setHostName(initialData.host_name || 'Ayush Saha');
+            setHostEmail(initialData.host_email || '');
+            setAccentColor(initialData.accent_color || '#8b5cf6');
+            if (initialData.schedule_id) {
+                setSelectedScheduleId(initialData.schedule_id);
+            }
+        } else {
+            // Reset defaults
+            setTitle('New Meeting');
+            setSlug('');
+            setIsSlugEdited(false);
+            setDuration('30');
+            setLocationType('');
+            setHostName('Ayush Saha');
+            setHostEmail('');
+            setAccentColor('#8b5cf6');
+            // Default schedule will be set after fetching schedules
+        }
+    };
+    loadInit();
   }, [initialData, isOpen]);
+
+  // Load Schedules
+  useEffect(() => {
+     if (!isOpen) return;
+     const fetchScheds = async () => {
+         try {
+             // getAllSchedules returns array directly now
+             const list = await scheduleService.getAllSchedules();
+             setSchedules(list);
+             
+             // If not selected yet (and new event), select default
+             if (!selectedScheduleId && (!initialData || !initialData.schedule_id)) {
+                 const def = list.find(s => s.is_default);
+                 if (def) setSelectedScheduleId(def.id);
+                 else if (list.length > 0) setSelectedScheduleId(list[0].id);
+             }
+         } catch (e) {
+             console.error("Failed to load schedules", e);
+         }
+     };
+     fetchScheds();
+  }, [isOpen]);
+
+  // Load Schedule Detail when selected
+  useEffect(() => {
+      if (!selectedScheduleId) return;
+      setScheduleDetail(null);
+      const fetchDetail = async () => {
+          try {
+              const detail = await scheduleService.getScheduleById(selectedScheduleId);
+              setScheduleDetail(detail);
+          } catch(e) {
+              console.error(e);
+          }
+      };
+      fetchDetail();
+  }, [selectedScheduleId]);
 
   // Auto-generate slug from title if not manually edited or existing
   useEffect(() => {
-    // Enable auto-gen if it's a new event (no ID) and slug is empty
+    // Enable auto-gen if it's a new event (no ID) and slug hasn't been manually edited
     const isNewEvent = !initialData || !initialData.id;
-    if (isNewEvent && !slug) {
+    if (isNewEvent && !isSlugEdited) {
         // Simple slug generation
         const generated = title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
         setSlug(generated);
     }
-  }, [title, initialData, slug]);
+  }, [title, initialData, isSlugEdited]);
 
-  const weeklyHours = [
-    { day: 'S', label: 'Sun', available: false },
-    { day: 'M', label: 'Mon', available: true },
-    { day: 'T', label: 'Tue', available: true },
-    { day: 'W', label: 'Wed', available: true },
-    { day: 'T', label: 'Thu', available: true },
-    { day: 'F', label: 'Fri', available: true },
-    { day: 'S', label: 'Sat', available: true },
-  ];
+  const getWeeklyHoursPreview = () => {
+      if (!scheduleDetail) return [];
+      
+      // Support both structure formats (flat DB array vs nested frontend state)
+      const slotsData = scheduleDetail.availability || scheduleDetail.slots || [];
+      
+      const days = [
+          { day: 'S', full: 'Sunday' },
+          { day: 'M', full: 'Monday' },
+          { day: 'T', full: 'Tuesday' },
+          { day: 'W', full: 'Wednesday' },
+          { day: 'T', full: 'Thursday' },
+          { day: 'F', full: 'Friday' },
+          { day: 'S', full: 'Saturday' }
+      ];
+
+      return days.map(d => {
+          // Robust checking for day name matches
+          const daySlots = slotsData.filter(s => {
+              const sDay = s.day_of_week || s.day; // Handle both property names
+              return sDay && sDay.toLowerCase() === d.full.toLowerCase();
+          });
+          const available = daySlots.length > 0;
+          
+          // Format slots for display
+          const formattedSlots = daySlots.map(slot => {
+              const formatTime = (t) => {
+                  if (!t) return '';
+                  // Parse HH:mm:ss or HH:mm
+                  const [h, m] = t.toString().split(':');
+                  const hour = parseInt(h);
+                  const period = hour >= 12 ? 'pm' : 'am';
+                  const hour12 = hour % 12 || 12; // 0 -> 12
+                  return `${hour12}:${m}${period}`;
+              };
+              return `${formatTime(slot.start_time || slot.start)} - ${formatTime(slot.end_time || slot.end)}`;
+          });
+          
+          return { day: d.day, label: d.full, available, slots: formattedSlots };
+      });
+  };
+    
+  const weeklyHours = getWeeklyHoursPreview();
 
 const handleSubmit = async () => {
     try {
       setIsSubmitting(true);
       const finalDuration = duration === 'custom' ? parseInt(customDuration) : parseInt(duration);
       
-      // Construct availability slots
-      const availabilitySlots = weeklyHours
-        .map((day, index) => {
-           if (!day.available) return null;
-           return {
-             day_of_week: index, 
-             start_time: '09:00:00',
-             end_time: '17:00:00'
-           };
-        })
-        .filter(Boolean);
-        
       // Use the slug from state directly. 
       // If empty, fallback to title-based slug logic (safeguard)
       const finalSlug = slug || title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
@@ -107,7 +199,9 @@ const handleSubmit = async () => {
         host_email: hostEmail || 'ayush@example.com',
         description: `Meeting with ${hostName}`, 
         timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-        availability: availabilitySlots
+        // availability: availabilitySlots, // Deprecated in favor of schedule_id
+        schedule_id: selectedScheduleId,
+        accent_color: accentColor
       };
       
       if (initialData && initialData.id) {
@@ -152,7 +246,40 @@ const handleSubmit = async () => {
           <div>
             <div className="text-sm font-medium text-gray-500 mb-1">Event type</div>
             <div className="flex items-center gap-3">
-              <div className="w-4 h-4 rounded-full bg-purple-600"></div>
+              <div className="relative">
+                <button
+                  onClick={() => setShowColorPicker(!showColorPicker)}
+                  className="w-4 h-4 rounded-full transition-transform hover:scale-110 focus:outline-none ring-2 ring-offset-1 ring-transparent hover:ring-gray-200"
+                  style={{ backgroundColor: accentColor }}
+                  title="Change event color"
+                />
+                
+                {showColorPicker && (
+                  <>
+                    <div 
+                        className="fixed inset-0 z-40"
+                        onClick={() => setShowColorPicker(false)}
+                    />
+                    <div className="absolute top-6 left-0 z-50 bg-white p-3 rounded-lg shadow-xl border border-gray-100 w-[140px] grid grid-cols-5 gap-2 animate-in fade-in zoom-in duration-200">
+                        {PRESET_COLORS.map((color) => (
+                        <button
+                            key={color}
+                            onClick={() => {
+                                setAccentColor(color);
+                                setShowColorPicker(false);
+                            }}
+                            className="w-5 h-5 rounded-full hover:scale-110 transition-transform relative group border border-gray-100"
+                            style={{ backgroundColor: color }}
+                        >
+                            {accentColor === color && (
+                                <Check size={12} className="text-white absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 drop-shadow-sm" />
+                            )}
+                        </button>
+                        ))}
+                    </div>
+                  </>
+                )}
+              </div>
               {isEditingTitle ? (
                 <input 
                   type="text" 
@@ -183,6 +310,7 @@ const handleSubmit = async () => {
                             // Only allow lowercase alphanumeric and hyphens
                             const val = e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '');
                             setSlug(val);
+                            setIsSlugEdited(true);
                         }}
                         className="bg-transparent focus:outline-none flex-1 font-medium text-gray-800"
                      />
@@ -314,36 +442,37 @@ const handleSubmit = async () => {
 
             {expandedSection === 'availability' && (
                 <div className="px-6 pb-6">
-                    {/* Date Range Settings */}
-                    <div className="mb-6">
-                        <h4 className="font-bold text-gray-800 mb-2">Date-range</h4>
-                        <div className="flex flex-wrap items-center gap-2 text-gray-700 text-sm">
-                            <span>Invitees can schedule</span>
-                             <button className="flex items-center gap-1 font-semibold text-blue-600 hover:bg-blue-50 px-2 py-0.5 rounded">
-                                60 days <ChevronDown size={14} />
-                             </button>
-                            <span>into the future with at least</span>
-                             <button className="flex items-center gap-1 font-semibold text-blue-600 hover:bg-blue-50 px-2 py-0.5 rounded">
-                                4 hours <ChevronDown size={14} />
-                             </button>
-                            <span>notice</span>
-                        </div>
-                    </div>
+                    
 
                     {/* Schedule Settings */}
                     <div className="mb-4">
                          <div className="flex items-center gap-2 mb-3">
                             <h4 className="font-bold text-gray-800">Schedule:</h4>
-                            <button className="flex items-center gap-1 font-semibold text-blue-600 hover:bg-blue-50 px-2 py-0.5 rounded">
-                                Working hours (default) <ChevronDown size={14} />
-                             </button>
+                            <div className="relative">
+                                <select 
+                                    value={selectedScheduleId || ''}
+                                    onChange={(e) => setSelectedScheduleId(parseInt(e.target.value))}
+                                    className="appearance-none bg-transparent font-semibold text-blue-600 hover:bg-blue-50 pl-2 pr-8 py-0.5 rounded cursor-pointer outline-none"
+                                >
+                                    {schedules.map(s => (
+                                        <option key={s.id} value={s.id}>
+                                            {s.name} {s.is_default ? '(Default)' : ''}
+                                        </option>
+                                    ))}
+                                </select>
+                                <ChevronDown size={14} className="absolute right-2 top-1/2 transform -translate-y-1/2 text-blue-600 pointer-events-none" />
+                            </div>
                          </div>
+                         
+                         
+                         
+                    </div>
 
                          {/* Preview Box */}
                          <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
                             <div className="flex justify-between items-start mb-4">
                                 <p className="text-sm text-gray-600 max-w-[80%]">
-                                    This event type uses the weekly and custom hours saved on the schedule
+                                    {scheduleDetail ? `This event type uses the "${scheduleDetail.name}" schedule.` : 'Select a schedule.'}
                                 </p>
                                 <button className="text-gray-500 hover:text-gray-700">
                                     <Edit2 size={16} />
@@ -357,29 +486,27 @@ const handleSubmit = async () => {
                                 </div>
                                 <div className="space-y-3">
                                     {weeklyHours.map((day, idx) => (
-                                        <div key={idx} className="flex items-center gap-4 text-sm">
-                                            <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${
-                                                day.available ? 'bg-blue-900 text-white' : 'bg-gray-200 text-gray-500'
+                                        <div key={idx} className="flex items-start gap-4 text-sm">
+                                            <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold mt-0.5 ${
+                                                day.available ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-400'
                                             }`}>
                                                 {day.day}
                                             </div>
-                                            <div className="text-gray-600">
-                                                {day.available ? '9:00am - 5:00pm' : 'Unavailable'}
+                                            <div className="text-gray-600 flex-1">
+                                                {day.available ? (
+                                                    <div className="flex flex-col gap-1">
+                                                        {day.slots.map((s, i) => <div key={i}>{s}</div>)}
+                                                    </div>
+                                                ) : 'Unavailable'}
                                             </div>
                                         </div>
                                     ))}
                                 </div>
                             </div>
                             
-                            <div className="text-sm text-gray-600">
-                                <div className="flex items-center gap-2 mb-1">
-                                     <Calendar size={14} />
-                                     <span>Date-specific hours</span>
-                                </div>
-                                <div className="ml-6">None</div>
-                            </div>
+                            
                          </div>
-                    </div>
+                   
                 </div>
             )}
           </div>

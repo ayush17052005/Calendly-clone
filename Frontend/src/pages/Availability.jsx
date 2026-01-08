@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import toast, { Toaster } from 'react-hot-toast';
 import scheduleService from '../services/schedule.service';
+import eventTypesService from '../services/eventTypes.service';
 
 const DateCustomCalendar = ({ isOpen, onClose, onSave, initialDate }) => {
     const [selectedDate, setSelectedDate] = useState(null);
@@ -318,7 +319,15 @@ const AvailabilityCalendarView = ({ scheduleData, customDates, onDateClick }) =>
 const Availability = () => {
   const [activeTab, setActiveTab] = useState('Schedules');
   const [scheduleId, setScheduleId] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
+  
+  // New State for Multi-schedule
+  const [schedules, setSchedules] = useState([]);
+  const [allEventTypes, setAllEventTypes] = useState([]);
+  const [currentSchedule, setCurrentSchedule] = useState(null);
+  const [showScheduleDropdown, setShowScheduleDropdown] = useState(false);
+  const [showActiveOnDropdown, setShowActiveOnDropdown] = useState(false);
+
   const [scheduleData, setScheduleData] = useState([]);
   const [isCustomModalOpen, setIsCustomModalOpen] = useState(false);
   const [timezone, setTimezone] = useState('UTC');
@@ -328,7 +337,6 @@ const Availability = () => {
   // State for the choice menu popover
   const [choiceMenu, setChoiceMenu] = useState({ isOpen: false, date: null, position: { x: 0, y: 0 } });
   const [customInitialDate, setCustomInitialDate] = useState(null);
-
 
   // Default structure
   const daysMap = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
@@ -347,29 +355,78 @@ const Availability = () => {
     'Europe/London'
   ];
 
+  // Initial Data Fetch
   useEffect(() => {
-    fetchSchedule();
+    const fetchInitialData = async () => {
+        try {
+            const [schedulesData, typesData] = await Promise.all([
+                scheduleService.getAllSchedules(),
+                eventTypesService.getAllEventTypes()
+            ]);
+            setSchedules(schedulesData);
+            setAllEventTypes(typesData);
+            
+            // Set default or first schedule if none selected
+            if (schedulesData.length > 0 && !scheduleId) {
+                const def = schedulesData.find(s => s.is_default) || schedulesData[0];
+                setScheduleId(def.id); 
+            } else if (schedulesData.length === 0) {
+                setLoading(false);
+            }
+        } catch (err) {
+            console.error(err);
+            toast.error("Failed to load availability data");
+            setLoading(false);
+        }
+    };
+    fetchInitialData();
   }, []);
 
-  const fetchSchedule = async () => {
+  // Fetch Details on Schedule Change
+  useEffect(() => {
+    if (scheduleId) {
+        fetchScheduleDetails(scheduleId);
+    }
+  }, [scheduleId]);
+
+  const fetchScheduleDetails = async (id) => {
+    setLoading(true);
     try {
-        const schedule = await scheduleService.getDefaultSchedule();
+        const schedule = await scheduleService.getScheduleById(id);
+        console.log("Fetched schedule details:", schedule); // Debug log
+        setCurrentSchedule(schedule);
+
         if (schedule) {
-            setScheduleId(schedule.id);
             if (schedule.timezone) setTimezone(schedule.timezone);
             
             // Transform slots to UI State
             const newData = JSON.parse(JSON.stringify(initialStructure));
             
-            schedule.slots.forEach(slot => {
-                const dayIndex = daysMap.indexOf(slot.day_of_week);
+            // Backend returns 'availability' for weekly slots. Fallback to empty array.
+            // Ensure we handle case sensitivity for day names just in case.
+            const slotsToProcess = schedule.availability || schedule.slots || [];
+            console.log("Processing slots:", slotsToProcess); // Debug log
+
+            slotsToProcess.forEach(slot => {
+                // Formatting helper for time
+                const formatTime = (t) => {
+                    if (!t) return '09:00';
+                    return t.length >= 5 ? t.substring(0, 5) : t;
+                };
+
+                // Find index case-insensitively
+                const dayIndex = daysMap.findIndex(d => 
+                    d.toLowerCase() === (slot.day_of_week || slot.day || '').toLowerCase()
+                );
+
                 if (dayIndex !== -1) {
                     newData[dayIndex].available = true;
-                    // substring to remove seconds if present 09:00:00 -> 09:00
                     newData[dayIndex].slots.push({
-                        start: slot.start_time.substring(0, 5),
-                        end: slot.end_time.substring(0, 5)
+                        start: formatTime(slot.start_time || slot.start),
+                        end: formatTime(slot.end_time || slot.end)
                     });
+                } else {
+                    console.warn("Could not map slot to day:", slot);
                 }
             });
             setScheduleData(newData);
@@ -390,24 +447,82 @@ const Availability = () => {
         }
     } catch (error) {
         console.error(error);
-        toast.error("Failed to fetch schedule");
+        toast.error("Failed to fetch schedule details");
     } finally {
         setLoading(false);
     }
   };
 
-  const updateScheduleState = (dayIndex, newSlots, available) => {
-      const newData = [...scheduleData];
-      newData[dayIndex] = { ...newData[dayIndex], slots: newSlots, available };
-      setScheduleData(newData);
+  const handleCreateSchedule = async () => {
+       const name = prompt("Enter schedule name:");
+       if (!name) return;
+       try {
+           const newSchedule = await scheduleService.createSchedule({ name, timezone });
+           setSchedules([...schedules, newSchedule]);
+           setScheduleId(newSchedule.id);
+           toast.success("Schedule created!");
+       } catch (error) {
+           console.error(error);
+           toast.error("Failed to create schedule");
+       }
   };
 
-  const handleSaveWeekly = async () => {
+  const handleDeleteSchedule = async () => {
+      if (!currentSchedule || currentSchedule.is_default) return;
+      if (!window.confirm("Are you sure you want to delete this schedule? Event types assigned to it will be unassigned.")) return;
+
+      try {
+          await scheduleService.deleteSchedule(scheduleId);
+          toast.success("Schedule deleted");
+          
+          const remaining = schedules.filter(s => s.id !== scheduleId);
+          setSchedules(remaining);
+          
+          if (remaining.length > 0) {
+              const next = remaining.find(s => s.is_default) || remaining[0];
+              setScheduleId(next.id);
+          } else {
+              setScheduleId(null);
+              setCurrentSchedule(null);
+              setScheduleData([]);
+          }
+      } catch (error) {
+          console.error(error);
+          toast.error("Failed to delete schedule");
+      }
+  };
+
+  const handleToggleEventAssignment = async (eventTypeId, currentStatus) => {
+      // Optimistic Update
+      setCurrentSchedule(prev => {
+          if (!prev) return prev;
+          const updatedEvents = !currentStatus 
+            ? [...(prev.eventTypes || []), { id: eventTypeId }]
+            : (prev.eventTypes || []).filter(e => e.id !== eventTypeId);
+            
+          return {
+               ...prev,
+               eventTypes: updatedEvents
+          };
+      });
+
+      try {
+          await scheduleService.toggleEventAssignment(scheduleId, eventTypeId, !currentStatus);
+          // Toast for confirmation
+          toast.success(currentStatus ? "Event type removed from schedule" : "Event type added to schedule");
+      } catch (error) {
+          console.error(error);
+          toast.error("Failed to update assignment");
+          // Revert on error by refetching
+          fetchScheduleDetails(scheduleId);
+      }
+  };
+
+  const saveScheduleToBackend = async (data, tz = null) => {
       if (!scheduleId) return;
-      
-      // Transform UI State to Backend API format
+
       const apiSlots = [];
-      scheduleData.forEach((dayData) => {
+      data.forEach((dayData) => {
           if (dayData.available) {
               dayData.slots.forEach(slot => {
                   apiSlots.push({
@@ -420,14 +535,25 @@ const Availability = () => {
       });
 
       try {
-          // Pass timezone as well
-          await scheduleService.updateWeeklySlots(scheduleId, apiSlots, timezone);
-          toast.success("Weekly hours & timezone saved!");
+          await scheduleService.updateWeeklySlots(scheduleId, apiSlots, tz || timezone);
+          // toast.success("Saved");
       } catch (error) {
           console.error(error);
-          toast.error("Failed to save changes");
+          toast.error("Failed to auto-save");
       }
   };
+
+  const updateScheduleState = (dayIndex, newSlots, available) => {
+      const newData = [...scheduleData];
+      newData[dayIndex] = { ...newData[dayIndex], slots: newSlots, available };
+      setScheduleData(newData);
+      
+      // Auto-save
+      saveScheduleToBackend(newData);
+  };
+
+  // handleSaveWeekly is no longer needed but we can keep the logic if we want to save timezone explicitly or mass save
+  // But user asked to remove save button. 
 
   const handleCustomSave = async (date, slots) => {
       if (!scheduleId) return;
@@ -435,7 +561,7 @@ const Availability = () => {
           await scheduleService.setDateCustom(scheduleId, date, slots);
           toast.success("Custom date added!");
           // Refresh to see update
-          fetchSchedule();
+          fetchScheduleDetails(scheduleId);
       } catch (error) {
           console.error(error);
           toast.error("Failed to add custom date");
@@ -514,14 +640,124 @@ const Availability = () => {
       <div className="bg-white border border-gray-200 rounded-lg shadow-sm">
           {/* Card Header */}
           <div className="p-6 border-b border-gray-200 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-              <div>
-                  <div className="flex items-center gap-2 mb-1">
-                      <h2 className="text-xl font-bold text-blue-600 cursor-pointer hover:underline">Working hours (default)</h2>
-                      <ChevronDown size={20} className="text-blue-600" />
+              <div className="space-y-2 relative">
+                  {/* Schedule Selector */}
+                  <div className="relative flex items-center gap-2">
+                      <button 
+                          onClick={() => setShowScheduleDropdown(!showScheduleDropdown)}
+                          className="flex items-center gap-2 text-xl font-bold text-blue-600 cursor-pointer hover:underline"
+                      >
+                          {currentSchedule?.name || 'Loading...'} 
+                          {currentSchedule?.is_default ? <span className="text-sm font-normal text-gray-500">(default)</span>:null}
+                          <ChevronDown size={20} className={`transform transition-transform ${showScheduleDropdown ? 'rotate-180' : ''}`} />
+                      </button>
+
+                      {currentSchedule && !currentSchedule.is_default && (
+                          <button 
+                              onClick={handleDeleteSchedule}
+                              className="text-gray-400 hover:text-red-500 p-1.5 rounded-full hover:bg-red-50 transition-colors"
+                              title="Delete this schedule"
+                          >
+                              <Trash2 size={16} />
+                          </button>
+                      )}
+
+                      {showScheduleDropdown && (
+                          <div className="absolute top-full left-0 mt-2 w-72 bg-white rounded-lg shadow-xl border border-gray-100 z-50 py-1">
+                              <div className="max-h-60 overflow-y-auto">
+                                  {schedules.map(s => (
+                                      <button
+                                          key={s.id}
+                                          onClick={() => {
+                                              setScheduleId(s.id);
+                                              setShowScheduleDropdown(false);
+                                          }}
+                                          className={`w-full text-left px-4 py-3 text-sm hover:bg-gray-50 flex justify-between items-center ${
+                                              scheduleId === s.id ? 'bg-blue-50 text-blue-700 font-medium' : 'text-gray-700'
+                                          }`}
+                                      >
+                                          <span className="truncate">{s.name}</span>
+                                          {s.is_default && <span className="text-xs bg-gray-200 text-gray-600 px-1.5 py-0.5 rounded">Default</span>}
+                                      </button>
+                                  ))}
+                              </div>
+                              <div className="border-t border-gray-100 p-2">
+                                   <button 
+                                      onClick={() => {
+                                          handleCreateSchedule();
+                                          setShowScheduleDropdown(false);
+                                      }}
+                                      className="w-full flex items-center justify-center gap-2 text-blue-600 hover:bg-blue-50 py-2 rounded-md text-sm font-medium transition-colors"
+                                   >
+                                       <Plus size={16} />
+                                       New schedule
+                                   </button>
+                              </div>
+                          </div>
+                      )}
                   </div>
-                  <div className="flex items-center gap-1 text-sm text-blue-600 cursor-pointer hover:underline">
-                      <span>Active on: <span className="font-semibold">All event types</span></span>
-                      <ChevronDown size={14} />
+
+                  {/* Active On Selector */}
+                  <div className="relative">
+                      <button 
+                          onClick={() => setShowActiveOnDropdown(!showActiveOnDropdown)}
+                          className="flex items-center gap-1 text-sm text-blue-600 cursor-pointer hover:underline"
+                      >
+                          <span>Active on: <span className="font-semibold">{currentSchedule?.eventTypes?.length || 0} event types</span></span>
+                          <ChevronDown size={14} className={`transform transition-transform ${showActiveOnDropdown ? 'rotate-180' : ''}`} />
+                      </button>
+
+                      {showActiveOnDropdown && (
+                          <div className="absolute top-full left-0 mt-2 w-80 bg-white rounded-lg shadow-xl border border-gray-100 z-50 py-2">
+                              {/* Group 1: Mapped to Current Schedule */}
+                              <div className="px-4 py-2 border-b border-gray-100 bg-gray-50/50">
+                                  <h4 className="text-xs font-bold text-gray-500 uppercase">Mapped to this schedule</h4>
+                              </div>
+                              <div className="p-2 space-y-1">
+                                  {allEventTypes.filter(e => currentSchedule?.eventTypes?.some(assigned => assigned.id === e.id)).map(event => (
+                                      <label key={event.id} className="flex items-center p-2 rounded hover:bg-gray-50 cursor-pointer">
+                                          <input 
+                                              type="checkbox"
+                                              checked={true}
+                                              onChange={() => handleToggleEventAssignment(event.id, true)}
+                                              className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded mr-3"
+                                          />
+                                          <div className="flex items-center gap-2 flex-1 min-w-0">
+                                              <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: event.accent_color || '#8b5cf6' }} />
+                                              <span className="text-sm font-medium text-gray-700 truncate">{event.title}</span>
+                                          </div>
+                                      </label>
+                                  ))}
+                                  {allEventTypes.filter(e => currentSchedule?.eventTypes?.some(assigned => assigned.id === e.id)).length === 0 && (
+                                      <div className="text-xs text-gray-400 p-2 italic">None</div>
+                                  )}
+                              </div>
+
+                              {/* Group 2: Not Mapped (or Mapped to Others) */}
+                              <div className="px-4 py-2 border-t border-b border-gray-100 bg-gray-50/50">
+                                  <h4 className="text-xs font-bold text-gray-500 uppercase">Not mapped to this schedule</h4>
+                              </div>
+                              <div className="max-h-48 overflow-y-auto p-2 space-y-1">
+                                  {allEventTypes.filter(e => !currentSchedule?.eventTypes?.some(assigned => assigned.id === e.id)).map(event => (
+                                      <label key={event.id} className="flex items-center p-2 rounded hover:bg-gray-50 cursor-pointer">
+                                          <input 
+                                              type="checkbox"
+                                              checked={false}
+                                              onChange={() => handleToggleEventAssignment(event.id, false)}
+                                              className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded mr-3"
+                                          />
+                                          <div className="flex items-center gap-2 flex-1 min-w-0">
+                                              <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: event.accent_color || '#8b5cf6' }} />
+                                              <span className="text-sm font-medium text-gray-700 truncate">{event.title}</span>
+                                          </div>
+                                      </label>
+                                  ))}
+                                   {allEventTypes.filter(e => !currentSchedule?.eventTypes?.some(assigned => assigned.id === e.id)).length === 0 && (
+                                      <div className="text-xs text-gray-400 p-2 italic">All event types assigned</div>
+                                  )}
+                              </div>
+                          </div>
+                      )}
                   </div>
               </div>
 
@@ -540,12 +776,6 @@ const Availability = () => {
                          <CalendarIcon size={16} /> Calendar
                       </button>
                   </div>
-                   <button 
-                        onClick={handleSaveWeekly}
-                        className="bg-blue-600 text-white px-4 py-1.5 rounded-lg text-sm font-medium hover:bg-blue-700 transition shadow-sm"
-                   >
-                        Save
-                   </button>
               </div>
           </div>
 
@@ -680,7 +910,11 @@ const Availability = () => {
                         <Globe size={16} />
                         <select 
                             value={timezone} 
-                            onChange={(e) => setTimezone(e.target.value)}
+                            onChange={(e) => {
+                                const newTz = e.target.value;
+                                setTimezone(newTz);
+                                saveScheduleToBackend(scheduleData, newTz);
+                            }}
                             className="bg-transparent border-none outline-none text-blue-600 font-medium appearance-none cursor-pointer pointer-events-auto"
                         >
                             {timezones.map(tz => (
@@ -690,7 +924,7 @@ const Availability = () => {
                         <ChevronDown size={14} />
                     </button>
                     <div className="text-xs text-gray-500 mt-1 pl-6">
-                        (Saving will update timezone for this schedule)
+                        (Updates are saved automatically)
                     </div>
                 </div>
            </div>

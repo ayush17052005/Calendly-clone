@@ -55,6 +55,17 @@ exports.getEventType = asyncHandler(async (req, res) => {
     });
 });
 
+exports.getEventTypeBySlug = asyncHandler(async (req, res) => {
+    const eventType = await eventTypeService.getEventTypeBySlug(req.params.slug);
+    if (!eventType) {
+        throw new NotFoundError('Event Type not found');
+    }
+    res.status(200).json({
+        status: 'success',
+        data: { eventType }
+    });
+});
+
 exports.getAvailableSlots = asyncHandler(async (req, res) => {
     const { id } = req.params;
     const { date } = req.query; // YYYY-MM-DD

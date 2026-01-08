@@ -14,7 +14,6 @@ CREATE TABLE schedules (
 
 CREATE TABLE event_types (
   id INT AUTO_INCREMENT PRIMARY KEY,
-  schedule_id INT,
   title VARCHAR(255) NOT NULL,
   slug VARCHAR(255) NOT NULL UNIQUE,
   description TEXT,
@@ -26,9 +25,17 @@ CREATE TABLE event_types (
   timezone VARCHAR(50) DEFAULT 'UTC',
   buffer_before INT DEFAULT 0,
   buffer_after INT DEFAULT 0,
+  accent_color VARCHAR(50) DEFAULT '#000000',
   is_active BOOLEAN DEFAULT TRUE,
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  FOREIGN KEY (schedule_id) REFERENCES schedules(id) ON DELETE SET NULL
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE schedule_event_types (
+  schedule_id INT NOT NULL,
+  event_type_id INT NOT NULL,
+  PRIMARY KEY (schedule_id, event_type_id),
+  FOREIGN KEY (schedule_id) REFERENCES schedules(id) ON DELETE CASCADE,
+  FOREIGN KEY (event_type_id) REFERENCES event_types(id) ON DELETE CASCADE
 );
 
 CREATE TABLE availability_slots (

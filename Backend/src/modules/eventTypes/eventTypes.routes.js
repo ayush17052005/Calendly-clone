@@ -7,6 +7,8 @@ router.route('/')
   .get(eventTypeController.getEventTypes)
   .post(eventTypeController.createEventType);
 
+router.get('/public/:slug', eventTypeController.getEventTypeBySlug);
+
 router.route('/:id')
   .get(eventTypeController.getEventType)
   .patch(eventTypeController.updateEventType)

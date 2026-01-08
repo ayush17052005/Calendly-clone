@@ -2,59 +2,103 @@ const { pool } = require('../../config/db');
 
 class EventTypeService {
   async getAllEventTypes() {
-    // Basic info for listing
-    const [rows] = await pool.query('SELECT id, title, slug, duration, host_name, location, is_active FROM event_types WHERE is_active = TRUE');
+    // Basic info for listing, include inactive ones so they can be managed. 
+    // Also fetch the primary schedule_id for UI convenience.
+    const query = `
+      SELECT 
+        et.id, et.title, et.slug, et.duration, et.host_name, et.location, et.is_active, et.accent_color,
+        (SELECT schedule_id FROM schedule_event_types WHERE event_type_id = et.id LIMIT 1) as schedule_id
+      FROM event_types et
+    `;
+    const [rows] = await pool.query(query);
     return rows;
   }
 
   async getEventTypeById(id) {
     const [rows] = await pool.query('SELECT * FROM event_types WHERE id = ?', [id]);
     const eventType = rows[0];
+    
     if (eventType) {
-        // Fetch availability slots
-        const [slots] = await pool.query('SELECT day_of_week, start_time, end_time FROM availability_slots WHERE event_type_id = ?', [id]);
-        eventType.availability = slots;
-        
-        // Fetch overrides (listing future ones only mostly)
-        const [overrides] = await pool.query('SELECT override_date, start_time, end_time FROM date_overrides WHERE event_type_id = ? AND override_date >= CURDATE()', [id]);
-        eventType.overrides = overrides;
+        return this._enrichEventType(eventType);
     }
     return eventType;
   }
 
+  async getEventTypeBySlug(slug) {
+    const [rows] = await pool.query('SELECT * FROM event_types WHERE slug = ?', [slug]);
+    const eventType = rows[0];
+    
+    if (eventType) {
+        return this._enrichEventType(eventType);
+    }
+    return eventType;
+  }
+
+  async _enrichEventType(eventType) {
+        // Fetch schedule_id from mapping table
+        const [schedRows] = await pool.query('SELECT schedule_id FROM schedule_event_types WHERE event_type_id = ? LIMIT 1', [eventType.id]);
+        if (schedRows.length > 0) {
+            eventType.schedule_id = schedRows[0].schedule_id;
+        }
+
+        // Fetch availability based on schedule if present
+        if (eventType.schedule_id) {
+             const [slots] = await pool.query('SELECT day_of_week, start_time, end_time FROM availability_slots WHERE schedule_id = ?', [eventType.schedule_id]);
+             eventType.availability = slots;
+             
+             const [overrides] = await pool.query('SELECT override_date, start_time, end_time FROM date_overrides WHERE schedule_id = ? AND override_date >= CURDATE()', [eventType.schedule_id]);
+             eventType.overrides = overrides;
+        } else {
+             // If no schedule assigned, handle accordingly (empty or legacy logic)
+             eventType.availability = [];
+             eventType.overrides = [];
+        }
+        return eventType;
+  }
+
+
   async createEventType(data) {
     const { 
         title, slug, duration, description, location, location_details, 
-        host_name, host_email, timezone, buffer_before, buffer_after, availability 
+        host_name, host_email, timezone, buffer_before, buffer_after,
+        accent_color, is_active, schedule_id
     } = data;
 
     const connection = await pool.getConnection();
     try {
         await connection.beginTransaction();
 
+        // Ensure unique slug
+        let uniqueSlug = slug;
+        let counter = 1;
+        while (true) {
+            const [rows] = await connection.query('SELECT id FROM event_types WHERE slug = ?', [uniqueSlug]);
+            if (rows.length === 0) break;
+            uniqueSlug = `${slug}-${counter}`;
+            counter++;
+        }
+
         const [result] = await connection.query(
           `INSERT INTO event_types (
             title, slug, duration, description, location, location_details, 
-            host_name, host_email, timezone, buffer_before, buffer_after
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            host_name, host_email, timezone, buffer_before, buffer_after,
+            accent_color, is_active
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
           [
-            title, slug, duration, description, location, location_details, 
-            host_name, host_email, timezone || 'UTC', buffer_before || 0, buffer_after || 0
+            title, uniqueSlug, duration, description, location, location_details, 
+            host_name, host_email, timezone || 'UTC', buffer_before || 0, buffer_after || 0,
+            accent_color || '#000000', is_active !== undefined ? is_active : true
           ]
         );
         const eventId = result.insertId;
-
-        // Insert availability slots if provided
-        if (availability && Array.isArray(availability) && availability.length > 0) {
-            const values = availability.map(slot => [eventId, slot.day_of_week, slot.start_time, slot.end_time]);
-            await connection.query(
-                'INSERT INTO availability_slots (event_type_id, day_of_week, start_time, end_time) VALUES ?',
-                [values]
-            );
+        
+        // Assign Schedule if provided
+        if (schedule_id) {
+            await connection.query('INSERT INTO schedule_event_types (schedule_id, event_type_id) VALUES (?, ?)', [schedule_id, eventId]);
         }
 
         await connection.commit();
-        return { id: eventId, ...data };
+        return this.getEventTypeById(eventId);
     } catch (error) {
         await connection.rollback();
         throw error;
@@ -64,78 +108,43 @@ class EventTypeService {
   }
 
   async updateEventType(id, data) {
-    const { 
-        title, slug, duration, description, location, location_details, 
-        host_name, host_email, timezone, buffer_before, buffer_after, availability 
-    } = data;
+      const { schedule_id, ...otherFields } = data;
+      const connection = await pool.getConnection();
+      
+      try {
+          // Update basic fields
+          const keys = Object.keys(otherFields);
+          if (keys.length > 0) {
+             // Filter out undefined
+             const validKeys = keys.filter(k => otherFields[k] !== undefined);
+             if (validKeys.length > 0) {
+                 const setClause = validKeys.map(k => `${k} = ?`).join(', ');
+                 const values = [...validKeys.map(k => otherFields[k]), id];
+                 await connection.query(`UPDATE event_types SET ${setClause} WHERE id = ?`, values);
+             }
+          }
 
-    const connection = await pool.getConnection();
-    try {
-        await connection.beginTransaction();
-
-        // Build dynamic update query
-        const fields = [];
-        const values = [];
-
-        if (title) { fields.push('title = ?'); values.push(title); }
-        if (slug) { fields.push('slug = ?'); values.push(slug); }
-        if (duration) { fields.push('duration = ?'); values.push(duration); }
-        if (description !== undefined) { fields.push('description = ?'); values.push(description); }
-        if (location) { fields.push('location = ?'); values.push(location); }
-        if (location_details !== undefined) { fields.push('location_details = ?'); values.push(location_details); }
-        if (host_name) { fields.push('host_name = ?'); values.push(host_name); }
-        if (host_email) { fields.push('host_email = ?'); values.push(host_email); }
-        if (timezone) { fields.push('timezone = ?'); values.push(timezone); }
-        if (buffer_before !== undefined) { fields.push('buffer_before = ?'); values.push(buffer_before); }
-        if (buffer_after !== undefined) { fields.push('buffer_after = ?'); values.push(buffer_after); }
-
-        if (fields.length > 0) {
-            values.push(id);
-            await connection.query(`UPDATE event_types SET ${fields.join(', ')} WHERE id = ?`, values);
-        }
-
-        // Update availability if provided
-        if (availability && Array.isArray(availability)) {
-            // Delete existing slots
-            await connection.query('DELETE FROM availability_slots WHERE event_type_id = ?', [id]);
-
-            // Insert new slots if any
-            if (availability.length > 0) {
-                const slotValues = availability.map(slot => [id, slot.day_of_week, slot.start_time, slot.end_time]);
-                await connection.query(
-                    'INSERT INTO availability_slots (event_type_id, day_of_week, start_time, end_time) VALUES ?',
-                    [slotValues]
-                );
-            }
-        }
-
-        await connection.commit();
-        
-        // Return updated object
-        return this.getEventTypeById(id);
-    } catch (error) {
-        await connection.rollback();
-        throw error;
-    } finally {
-        connection.release();
-    }
+          // Update Schedule Assignment
+          if (schedule_id !== undefined) {
+             // Delete existing
+             await connection.query('DELETE FROM schedule_event_types WHERE event_type_id = ?', [id]);
+             // Insert new if not null
+             if (schedule_id) {
+                 await connection.query('INSERT INTO schedule_event_types (schedule_id, event_type_id) VALUES (?, ?)', [schedule_id, id]);
+             }
+          }
+          
+          return this.getEventTypeById(id);
+      } finally {
+          connection.release();
+      }
   }
 
   async deleteEventType(id) {
     const connection = await pool.getConnection();
     try {
         await connection.beginTransaction();
-
-        // Soft delete or hard delete? Usually soft delete is better for history, 
-        // but requirements didn't specify. The listing query checks is_active=TRUE.
-        // Let's do soft delete.
         await connection.query('UPDATE event_types SET is_active = FALSE WHERE id = ?', [id]);
-        
-        // Alternatively, if hard delete is preferred:
-        // await connection.query('DELETE FROM availability_slots WHERE event_type_id = ?', [id]);
-        // await connection.query('DELETE FROM date_overrides WHERE event_type_id = ?', [id]);
-        // await connection.query('DELETE FROM event_types WHERE id = ?', [id]);
-        
         await connection.commit();
         return true;
     } catch (error) {

@@ -66,6 +66,20 @@ const Scheduling = () => {
     setSelectedEvent(null);
   };
   
+  const handleToggleActive = async (e, event) => {
+    e.stopPropagation();
+    try {
+        await eventTypesService.updateEventType(event.id, { is_active: !event.is_active });
+        toast.success(`Event type turned ${!event.is_active ? 'on' : 'off'}`);
+        fetchEventTypes();
+    } catch (error) {
+        console.error(error);
+        toast.error("Failed to update status");
+    } finally {
+        setActiveDropdownId(null);
+    }
+  };
+
   const handleCopyLink = (e, event) => {
     e.stopPropagation();
     const username = "ayushsaha1705"; // Hardcoded as per request
@@ -239,10 +253,13 @@ const Scheduling = () => {
           <div 
             key={event.id} 
             onClick={(e) => handleEditEvent(event, e)}
-            className="flex flex-col md:flex-row bg-white border border-gray-200 rounded-lg shadow-sm hover:shadow-md transition-shadow group cursor-pointer relative"
+            className={`flex flex-col md:flex-row bg-white border border-gray-200 rounded-lg shadow-sm hover:shadow-md transition-all group cursor-pointer relative ${!event.is_active ? 'opacity-60 grayscale' : ''}`}
           >
             {/* Colored Indicator Line */}
-            <div className={`w-2 md:w-1.5 self-stretch bg-purple-600 md:rounded-l-lg`}></div> 
+            <div 
+                className={`w-2 md:w-1.5 self-stretch md:rounded-l-lg`}
+                style={{ backgroundColor: event.accent_color || '#8b5cf6' }} // Default to purple-600
+            ></div> 
 
 
              {/* Checkbox */}
@@ -276,13 +293,22 @@ const Scheduling = () => {
             
             {/* Actions */}
             <div className="p-5 md:p-6 flex items-center border-t md:border-t-0 md:border-l border-gray-100 gap-3">
-                <button 
-                    onClick={(e) => handleCopyLink(e, event)}
-                    className="flex items-center gap-2 text-blue-600 border border-blue-600 hover:bg-blue-50 px-3 py-1.5 rounded-full text-sm font-medium transition-colors"
-                >
-                    <LinkIcon size={16} />
-                    Copy link
-                </button>
+                {event.is_active ? (
+                    <button 
+                        onClick={(e) => handleCopyLink(e, event)}
+                        className="flex items-center gap-2 text-blue-600 border border-blue-600 hover:bg-blue-50 px-3 py-1.5 rounded-full text-sm font-medium transition-colors"
+                    >
+                        <LinkIcon size={16} />
+                        Copy link
+                    </button>
+                ) : (
+                    <button 
+                        onClick={(e) => handleToggleActive(e, event)}
+                        className="flex items-center gap-2 text-gray-700 border border-gray-300 hover:bg-gray-50 px-3 py-1.5 rounded-full text-sm font-medium transition-colors"
+                    >
+                        Turn on
+                    </button>
+                )}
                 
                 <div className="relative">
                      <button 
@@ -303,6 +329,12 @@ const Scheduling = () => {
                                 className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-3 transition-colors"
                             >
                                 <span>Edit</span>
+                            </button>
+                            <button 
+                                onClick={(e) => handleToggleActive(e, event)}
+                                className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-3 transition-colors"
+                            >
+                                <span>{event.is_active ? 'Turn off' : 'Turn on'}</span>
                             </button>
                             <button 
                                 onClick={(e) => handleDuplicate(e, event)}
