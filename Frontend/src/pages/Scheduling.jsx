@@ -83,8 +83,8 @@ const Scheduling = () => {
 
   const handleCopyLink = (e, event) => {
     e.stopPropagation();
-    const username = "ayushsaha1705"; // Hardcoded as per request
-    const url = `${window.location.origin}/${username}/booking/${event.slug}`;
+    const username = ""; // Hardcoded as per request
+    const url = `${window.location.origin}/booking/${event.slug}`;
     navigator.clipboard.writeText(url);
     toast.success('Link copied to clipboard!');
   };
