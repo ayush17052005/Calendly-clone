@@ -26,9 +26,7 @@ const eventTypesService = {
     });
     return response.data?.data?.slots || [];
   },
-    });
-    return response.data;
-  },
+    
 
   // Create a new event type
   createEventType: async (data) => {

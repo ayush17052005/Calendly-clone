@@ -19,6 +19,12 @@ const bookingsService = {
     return response.data;
   },
 
+  // Delete a booking
+  deleteBooking: async (id) => {
+    const response = await api.delete(`/bookings/${id}`);
+    return response.data;
+  },
+
   // Reschedule a booking
   rescheduleBooking: async (id, newSlot) => {
     const response = await api.post(`/bookings/${id}/reschedule`, newSlot);

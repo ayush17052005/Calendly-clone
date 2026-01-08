@@ -4,7 +4,8 @@ const asyncHandler = require('../../utils/asyncHandler');
 const { BadRequestError, NotFoundError } = require('../../utils/errors');
 
 exports.getBookings = asyncHandler(async (req, res) => {
-    const bookings = await bookingService.getBookings();
+    const filters = req.query;
+    const bookings = await bookingService.getBookings(filters);
     res.status(200).json({
         status: 'success',
         results: bookings.length,
@@ -32,14 +33,23 @@ exports.createBooking = asyncHandler(async (req, res) => {
         throw new NotFoundError('Event Type not found');
     }
 
-    const start = new Date(start_time);
+    // Treat the incoming string as UTC to preserve face value (avoid local timezone shift)
+    // Ensures "2026-01-09 09:30:00" stays "2026-01-09 09:30:00" in DB
+    const timeStr = start_time.replace(' ', 'T') + (start_time.includes('Z') ? '' : 'Z');
+    const start = new Date(timeStr);
+    
+    // Add duration (in minutes)
     const end = new Date(start.getTime() + eventType.duration * 60000);
     
+    // Format dates for MySQL (YYYY-MM-DD HH:MM:SS) - Using toISOString preserves the UTC calculations
+    const formatDate = (d) => d.toISOString().slice(0, 19).replace('T', ' ');
+
     // TODO: Validate that the slot is actually free (Slot utility needed)
 
     const bookingData = {
         ...req.body,
-        end_time: end,
+        start_time: formatDate(start),
+        end_time: formatDate(end),
         duration: eventType.duration
     };
 
@@ -59,6 +69,17 @@ exports.cancelBooking = asyncHandler(async (req, res) => {
     });
 });
 
+exports.deleteBooking = asyncHandler(async (req, res) => {
+    const success = await bookingService.deleteBooking(req.params.id);
+    if (!success) {
+        throw new NotFoundError('Booking not found');
+    }
+    res.status(200).json({
+        status: 'success',
+        message: 'Booking deleted'
+    });
+});
+
 exports.rescheduleBooking = asyncHandler(async (req, res) => {
     const oldBookingId = req.params.id;
     const { start_time } = req.body;
@@ -67,15 +88,20 @@ exports.rescheduleBooking = asyncHandler(async (req, res) => {
     if (!oldBooking) throw new NotFoundError('Booking not found');
 
     const eventType = await eventTypeService.getEventTypeById(oldBooking.event_type_id);
-    const start = new Date(start_time);
+    
+    // Treat the incoming string as UTC to preserve face value
+    const timeStr = start_time.replace(' ', 'T') + (start_time.includes('Z') ? '' : 'Z');
+    const start = new Date(timeStr);
     const end = new Date(start.getTime() + eventType.duration * 60000);
+
+    const formatDate = (d) => d.toISOString().slice(0, 19).replace('T', ' ');
 
     const newBookingData = {
         event_type_id: oldBooking.event_type_id,
         booker_name: oldBooking.booker_name,
         booker_email: oldBooking.booker_email,
-        start_time: start,
-        end_time: end
+        start_time: formatDate(start),
+        end_time: formatDate(end)
     };
     
     const newBooking = await bookingService.rescheduleBooking(oldBookingId, newBookingData);

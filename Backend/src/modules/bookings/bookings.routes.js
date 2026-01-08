@@ -8,7 +8,8 @@ router.route('/')
     .post(bookingController.createBooking);
 
 router.route('/:id')
-    .get(bookingController.getBooking);
+    .get(bookingController.getBooking)
+    .delete(bookingController.deleteBooking);
 
 router.post('/:id/cancel', bookingController.cancelBooking);
 router.post('/:id/reschedule', bookingController.rescheduleBooking);

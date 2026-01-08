@@ -53,7 +53,7 @@ const Sidebar = ({ isOpen, onClose }) => {
 
         {/* Create Button */}
         <div className="px-4 pb-4">
-          <button className="w-full bg-white border-[1px] border-blue-700 hover:bg-blue-700 text-blue-700 rounded-full py-2.5 px-4 flex items-center justify-center gap-2 font-medium shadow-sm transition-colors">
+          <button className="w-full bg-white border-[1px] border-blue-700 hover:bg-white text-blue-700 rounded-full py-2.5 px-4 flex items-center justify-center gap-2 font-medium shadow-sm transition-colors">
             <Plus size={20} />
             Create
           </button>

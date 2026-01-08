@@ -1,15 +1,29 @@
 const { pool } = require('../../config/db');
 
 class BookingService {
-  async getBookings() {
-      // Get all bookings (optional filter could be added later)
-      const query = `
-        SELECT b.*, et.title as event_title, et.slug as event_slug
+  async getBookings(filters = {}) {
+      const { type, startDate, endDate } = filters;
+      let query = `
+        SELECT b.*, et.title as event_title, et.slug as event_slug, et.location, et.host_name
         FROM bookings b
         JOIN event_types et ON b.event_type_id = et.id
-        ORDER BY b.start_time DESC
+        WHERE 1=1 
       `;
-      const [rows] = await pool.query(query);
+      
+      const params = [];
+
+      if (type === 'upcoming') {
+          query += ` AND b.start_time >= NOW()`;
+      } else if (type === 'past') {
+          query += ` AND b.start_time < NOW()`;
+      } else if (type === 'range' && startDate && endDate) {
+          query += ` AND b.start_time BETWEEN ? AND ?`;
+          params.push(startDate, endDate);
+      }
+
+      query += ` ORDER BY b.start_time ${type === 'past' ? 'DESC' : 'ASC'}`;
+
+      const [rows] = await pool.query(query, params);
       return rows;
   }
 
@@ -62,6 +76,11 @@ class BookingService {
         [status, reason, id]
       );
       return { id, status, cancellation_reason: reason };
+  }
+
+  async deleteBooking(id) {
+      const [result] = await pool.query('DELETE FROM bookings WHERE id = ?', [id]);
+      return result.affectedRows > 0;
   }
 
   async rescheduleBooking(oldBookingId, newSlotData) {

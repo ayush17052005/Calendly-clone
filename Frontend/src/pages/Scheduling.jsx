@@ -10,7 +10,8 @@ import {
   Copy,
   Trash2,
   X,
-  Eye
+  Eye,
+  Calendar
 } from 'lucide-react';
 import toast, { Toaster } from 'react-hot-toast';
 import CreateEventModal from '../components/CreateEventModal';
@@ -293,6 +294,20 @@ const Scheduling = () => {
             
             {/* Actions */}
             <div className="p-5 md:p-6 flex items-center border-t md:border-t-0 md:border-l border-gray-100 gap-3">
+                {/* Book Meeting Button (New) */}
+                {event.is_active && (
+                   <button 
+                      onClick={(e) => {
+                          e.stopPropagation();
+                          window.open(`/booking/${event.slug}`, '_blank');
+                      }}
+                      className="p-2 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded-full transition-colors"
+                      title="Book meeting"
+                  >
+                      <Calendar size={20} />
+                  </button>
+                )}
+
                 {event.is_active ? (
                     <button 
                         onClick={(e) => handleCopyLink(e, event)}
