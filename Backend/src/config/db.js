@@ -12,6 +12,12 @@ const testConnection = async () => {
         console.log('Database connected successfully.');
     } catch (error) {
         console.error('Database connection failed:', error);
+        console.error('Connection details:', {
+            host: config.db.host,
+            user: config.db.user,
+            port: config.db.port,
+            database: config.db.database
+        });
         process.exit(1);
     }
 };
