@@ -33,11 +33,12 @@ class BookingService {
         FROM bookings 
         WHERE event_type_id = ? 
         AND status = 'confirmed'
-        AND start_time >= ? 
-        AND end_time <= ?
+        AND start_time < ? 
+        AND end_time > ?
       `; 
       
-      const [rows] = await pool.query(query, [eventTypeId, startDate, endDate]);
+      // We check for overlap: Booking Start < Range End AND Booking End > Range Start
+      const [rows] = await pool.query(query, [eventTypeId, endDate, startDate]);
       return rows;
   }
 

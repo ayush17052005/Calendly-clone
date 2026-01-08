@@ -79,8 +79,10 @@ exports.getAvailableSlots = asyncHandler(async (req, res) => {
         throw new NotFoundError('Event Type not found');
     }
 
-    // 1. Determine Weekday from Date
-    const targetDate = new Date(date);
+    // 1. Determine Weekday from Date (Local)
+    // Safely construct local date from YYYY-MM-DD
+    const [year, month, day] = date.split('-').map(Number);
+    const targetDate = new Date(year, month - 1, day);
     const dayOfWeek = targetDate.toLocaleDateString('en-US', { weekday: 'long' });
 
     // 2. Get Availability for that day (or override)
@@ -103,9 +105,11 @@ exports.getAvailableSlots = asyncHandler(async (req, res) => {
     }
 
     // 3. Get Bookings for that day
-    const dayStart = new Date(date);
+    // Use the local targetDate set to start/end of day
+    const dayStart = new Date(targetDate);
     dayStart.setHours(0,0,0,0);
-    const dayEnd = new Date(date);
+    
+    const dayEnd = new Date(targetDate);
     dayEnd.setHours(23,59,59,999);
 
     const bookings = await bookingService.getBookingsForEventAndDateRange(id, dayStart, dayEnd);

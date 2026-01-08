@@ -224,9 +224,7 @@ const Meetings = () => {
                                           
                                           {/* Left Actions Column */}
                                           <div className="w-full md:w-64 space-y-3 flex flex-col">
-                                              <button className="flex items-center gap-2 justify-center w-full py-2 border border-blue-600 text-blue-600 rounded-full text-sm font-medium hover:bg-blue-50 transition-colors">
-                                                 <Edit size={14} /> Edit Invitee Limit
-                                              </button>
+                                              
                                               <button className="flex items-center gap-2 justify-center w-full py-2 border border-gray-300 text-gray-700 rounded-full text-sm font-medium hover:bg-white transition-colors">
                                                  <Download size={14} /> Export
                                               </button>
@@ -237,17 +235,7 @@ const Meetings = () => {
                                                  <Trash2 size={14} /> Delete
                                               </button>
 
-                                              <div className="pt-4 space-y-3">
-                                                  <button className="flex items-center gap-2 text-blue-600 text-sm hover:underline">
-                                                      <ExternalLink size={14} /> Edit Event Type
-                                                  </button>
-                                                  <button className="flex items-center gap-2 text-blue-600 text-sm hover:underline">
-                                                      <Filter size={14} /> Filter by Event Type
-                                                  </button>
-                                                  <button className="flex items-center gap-2 text-blue-600 text-sm hover:underline">
-                                                      <Flag size={14} /> Report this event
-                                                  </button>
-                                              </div>
+                                              
                                           </div>
 
                                           {/* Right Info Column */}

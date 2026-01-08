@@ -2,14 +2,33 @@ import React, { useState } from 'react';
 import { Outlet } from 'react-router-dom';
 import Sidebar from './Sidebar';
 import { Menu } from 'lucide-react';
+import CreateEventModal from './CreateEventModal';
 
 const Layout = () => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
 
   return (
     <div className="flex h-screen bg-gray-50 overflow-hidden">
       {/* Sidebar Component - Static on Desktop, Fixed on Mobile */}
-      <Sidebar isOpen={isSidebarOpen} onClose={() => setIsSidebarOpen(false)} />
+      <Sidebar 
+          isOpen={isSidebarOpen} 
+          onClose={() => setIsSidebarOpen(false)} 
+          onCreateClick={() => setIsCreateModalOpen(true)}
+      />
+
+      {/* Modal */}
+      {isCreateModalOpen && (
+        <CreateEventModal 
+            isOpen={true} 
+            onClose={() => setIsCreateModalOpen(false)}
+            onEventCreate={() => {
+                setIsCreateModalOpen(false);
+                // Optionally trigger a refresh if we were on the dashboard, 
+                // but since we are in layout, we might just let the user navigate
+            }}
+        />
+      )}
 
       {/* Content Area */}
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
