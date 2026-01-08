@@ -12,7 +12,22 @@ class ScheduleService {
     const schedule = rows[0];
     if (schedule) {
       // Fetch slots
-      const [slots] = await pool.query('SELECT day_of_week, start_time, end_time FROM availability_slots WHERE schedule_id = ? ORDER BY FIELD(day_of_week, "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"), start_time', [id]);
+      const [slots] = await pool.query(`
+        SELECT day_of_week, start_time, end_time 
+        FROM availability_slots 
+        WHERE schedule_id = ? 
+        ORDER BY 
+          CASE 
+            WHEN day_of_week = 'Monday' THEN 1
+            WHEN day_of_week = 'Tuesday' THEN 2
+            WHEN day_of_week = 'Wednesday' THEN 3
+            WHEN day_of_week = 'Thursday' THEN 4
+            WHEN day_of_week = 'Friday' THEN 5
+            WHEN day_of_week = 'Saturday' THEN 6
+            WHEN day_of_week = 'Sunday' THEN 7
+          END, 
+          start_time
+      `, [id]);
       schedule.availability = slots;
       
       // Fetch active overrides (future)

@@ -65,8 +65,8 @@ class BookingService {
     }
 
     const [result] = await pool.query(
-      'INSERT INTO bookings (event_type_id, booker_name, booker_email, start_time, end_time, status) VALUES (?, ?, ?, ?, ?, "confirmed")',
-      [event_type_id, booker_name, booker_email, start_time, end_time]
+      'INSERT INTO bookings (event_type_id, booker_name, booker_email, start_time, end_time, status) VALUES (?, ?, ?, ?, ?, ?)',
+      [event_type_id, booker_name, booker_email, start_time, end_time, 'confirmed']
     );
     return { id: result.insertId, ...data, status: 'confirmed' };
   }
