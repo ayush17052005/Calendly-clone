@@ -85,33 +85,4 @@ exports.deleteBooking = asyncHandler(async (req, res) => {
     });
 });
 
-exports.rescheduleBooking = asyncHandler(async (req, res) => {
-    const oldBookingId = req.params.id;
-    const { start_time } = req.body;
 
-    const oldBooking = await bookingService.getBookingById(oldBookingId);
-    if (!oldBooking) throw new NotFoundError('Booking not found');
-
-    const eventType = await eventTypeService.getEventTypeById(oldBooking.event_type_id);
-    
-    // Treat the incoming string as UTC to preserve face value
-    const timeStr = start_time.replace(' ', 'T') + (start_time.includes('Z') ? '' : 'Z');
-    const start = new Date(timeStr);
-    const end = new Date(start.getTime() + eventType.duration * 60000);
-
-    const formatDate = (d) => d.toISOString().slice(0, 19).replace('T', ' ');
-
-    const newBookingData = {
-        event_type_id: oldBooking.event_type_id,
-        booker_name: oldBooking.booker_name,
-        booker_email: oldBooking.booker_email,
-        start_time: formatDate(start),
-        end_time: formatDate(end)
-    };
-    
-    const newBooking = await bookingService.rescheduleBooking(oldBookingId, newBookingData);
-    res.status(200).json({
-        status: 'success',
-        data: { booking: newBooking }
-    });
-});

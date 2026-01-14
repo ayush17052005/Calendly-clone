@@ -314,7 +314,11 @@ const BookingPage = () => {
                             ) : availableSlots.length === 0 ? (
                                 <div className="text-center py-4 text-gray-400 text-sm">No slots available</div>
                             ) : (
-                                availableSlots.map((timeStr, idx) => {
+                                availableSlots.map((slotData, idx) => {
+                                    // Handle both object { time, available_seats } and legacy string "HH:MM"
+                                    const timeStr = typeof slotData === 'object' ? slotData.time : slotData;
+                                    const seatsLeft = typeof slotData === 'object' ? slotData.available_seats : null;
+                                    
                                     // 12-hour format conversion
                                     const formatTime12 = (t) => {
                                         const [h, m] = t.split(':').map(Number);
@@ -335,13 +339,18 @@ const BookingPage = () => {
                                             
                                             setSelectedSlot({ start: timeStr, end: endStr });
                                         }}
-                                        className={`w-full py-2 px-1 border rounded font-medium text-sm transition-all ${
+                                        className={`w-full py-2 px-1 border rounded font-medium text-sm transition-all flex justify-between items-center px-3 ${
                                             selectedSlot?.start === timeStr
                                                 ? 'bg-blue-600 text-white border-blue-600 shadow-md ring-2 ring-blue-200'
                                                 : 'text-blue-600 border-blue-200 hover:border-blue-600 bg-blue-50/50'
                                         }`}
                                     >
-                                        {formatTime12(timeStr)} 
+                                        <span>{formatTime12(timeStr)}</span>
+                                        {seatsLeft !== null && eventType.booking_type === 'group' && (
+                                            <span className={`text-xs ${selectedSlot?.start === timeStr ? 'text-blue-200' : 'text-gray-500'}`}>
+                                                {seatsLeft} left
+                                            </span>
+                                        )}
                                     </button>
                                     );
                                 })

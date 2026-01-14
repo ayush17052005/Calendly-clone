@@ -283,7 +283,7 @@ const Scheduling = () => {
                         <span>•</span>
                         <span>{event.location || 'No Location'}</span>
                         <span>•</span>
-                        <span>One-on-One</span>
+                        <span>{event.booking_type === 'one_on_one' ? 'One-on-One' : 'Group'}</span>
                     </div>
                      <div className="text-gray-500 text-sm mt-2">
                         View availability details

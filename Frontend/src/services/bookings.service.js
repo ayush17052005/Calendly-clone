@@ -25,11 +25,7 @@ const bookingsService = {
     return response.data;
   },
 
-  // Reschedule a booking
-  rescheduleBooking: async (id, newSlot) => {
-    const response = await api.post(`/bookings/${id}/reschedule`, newSlot);
-    return response.data;
-  }
+ 
 };
 
 export default bookingsService;

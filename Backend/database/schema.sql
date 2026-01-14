@@ -30,6 +30,8 @@ CREATE TABLE event_types (
   buffer_after INT DEFAULT 0,
   accent_color VARCHAR(50) DEFAULT '#000000',
   is_active BOOLEAN DEFAULT TRUE,
+  booking_type ENUM('one_on_one', 'group') DEFAULT 'one_on_one',
+  capacity INT DEFAULT 1,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -74,10 +76,9 @@ CREATE TABLE bookings (
   booker_email VARCHAR(255) NOT NULL,
   start_time DATETIME NOT NULL,
   end_time DATETIME NOT NULL,
-  status ENUM('confirmed', 'cancelled', 'rescheduled') DEFAULT 'confirmed',
+  status ENUM('confirmed', 'cancelled') DEFAULT 'confirmed',
   cancellation_reason TEXT,
-  rescheduled_from_id INT,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (event_type_id) REFERENCES event_types(id) ON DELETE CASCADE,
-  FOREIGN KEY (rescheduled_from_id) REFERENCES bookings(id) ON DELETE SET NULL
+ 
 );

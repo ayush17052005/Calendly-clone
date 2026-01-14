@@ -5,7 +5,6 @@ import Layout from './components/Layout';
 import Scheduling from './pages/Scheduling';
 import Meetings from './pages/Meetings';
 import Availability from './pages/Availability';
-import Contacts from './pages/Contacts';
 
 
 function App() {
@@ -18,7 +17,6 @@ function App() {
         <Route path="scheduling" element={<Scheduling />} />
         <Route path="meetings" element={<Meetings />} />
         <Route path="availability" element={<Availability />} />
-        <Route path="contacts" element={<Contacts />} />
       </Route>
     </Routes> 
   );

@@ -121,7 +121,9 @@ exports.getAvailableSlots = asyncHandler(async (req, res) => {
         bookings,
         duration: eventType.duration,
         bufferBefore: eventType.buffer_before,
-        bufferAfter: eventType.buffer_after
+        bufferAfter: eventType.buffer_after,
+        bookingType: eventType.booking_type || 'one_on_one',
+        capacity: eventType.capacity || 1
     });
 
     res.status(200).json({

@@ -16,7 +16,7 @@ const Sidebar = ({ isOpen, onClose, onCreateClick }) => {
     { name: 'Scheduling', path: '/scheduling', icon: <LinkIcon size={20} /> },
     { name: 'Meetings', path: '/meetings', icon: <Calendar size={20} /> },
     { name: 'Availability', path: '/availability', icon: <Clock size={20} /> },
-    // { name: 'Contacts', path: '/contacts', icon: <Users size={20} /> },
+   
   ];
 
   return (

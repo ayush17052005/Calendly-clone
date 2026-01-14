@@ -12,6 +12,5 @@ router.route('/:id')
     .delete(bookingController.deleteBooking);
 
 router.post('/:id/cancel', bookingController.cancelBooking);
-router.post('/:id/reschedule', bookingController.rescheduleBooking);
 
 module.exports = router;

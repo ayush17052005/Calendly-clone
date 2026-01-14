@@ -6,7 +6,7 @@ class EventTypeService {
     // Also fetch the primary schedule_id for UI convenience.
     const query = `
       SELECT 
-        et.id, et.title, et.slug, et.duration, et.host_name, et.location, et.is_active, et.accent_color,
+        et.id, et.title, et.slug, et.duration, et.host_name, et.location, et.is_active, et.accent_color, et.booking_type, et.capacity,
         (SELECT schedule_id FROM schedule_event_types WHERE event_type_id = et.id LIMIT 1) as schedule_id
       FROM event_types et
     `;
@@ -61,7 +61,7 @@ class EventTypeService {
     const { 
         title, slug, duration, description, location, location_details, 
         host_name, host_email, timezone, buffer_before, buffer_after,
-        accent_color, is_active, schedule_id
+        accent_color, is_active, schedule_id, booking_type, capacity
     } = data;
 
     const connection = await pool.getConnection();
@@ -82,12 +82,13 @@ class EventTypeService {
           `INSERT INTO event_types (
             title, slug, duration, description, location, location_details, 
             host_name, host_email, timezone, buffer_before, buffer_after,
-            accent_color, is_active
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            accent_color, is_active, booking_type, capacity
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
           [
             title, uniqueSlug, duration, description, location, location_details, 
             host_name, host_email, timezone || 'UTC', buffer_before || 0, buffer_after || 0,
-            accent_color || '#000000', is_active !== undefined ? is_active : true
+            accent_color || '#000000', is_active !== undefined ? is_active : true,
+            booking_type || 'one_on_one', (booking_type === 'group') ? (capacity || 1) : 1
           ]
         );
         const eventId = result.insertId;
@@ -109,6 +110,12 @@ class EventTypeService {
 
   async updateEventType(id, data) {
       const { schedule_id, ...otherFields } = data;
+
+      // Enforce consistency: if switching to one_on_one, force capacity to 1
+      if (otherFields.booking_type === 'one_on_one') {
+          otherFields.capacity = 1;
+      }
+
       const connection = await pool.getConnection();
       
       try {

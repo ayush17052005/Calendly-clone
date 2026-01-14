@@ -32,6 +32,8 @@ const CreateEventModal = ({ isOpen, onClose, isModal = true, onEventCreate, init
   const [duration, setDuration] = useState('30');
   const [customDuration, setCustomDuration] = useState('');
   const [locationType, setLocationType] = useState('');
+  const [bookingType, setBookingType] = useState('one_on_one'); // 'one_on_one' | 'group'
+  const [capacity, setCapacity] = useState(1);
   
   // Schedule State
   const [schedules, setSchedules] = useState([]);
@@ -67,6 +69,8 @@ const CreateEventModal = ({ isOpen, onClose, isModal = true, onEventCreate, init
             setIsSlugEdited(!!initialData.slug);
             setDuration(initialData.duration?.toString() || '30');
             setLocationType(initialData.location || '');
+            setBookingType(initialData.booking_type || 'one_on_one');
+            setCapacity(initialData.capacity || 1);
             setHostName(initialData.host_name || 'Ayush Saha');
             setHostEmail(initialData.host_email || '');
             setAccentColor(initialData.accent_color || '#8b5cf6');
@@ -80,6 +84,8 @@ const CreateEventModal = ({ isOpen, onClose, isModal = true, onEventCreate, init
             setIsSlugEdited(false);
             setDuration('30');
             setLocationType('');
+            setBookingType('one_on_one');
+            setCapacity(1);
             setHostName('Ayush Saha');
             setHostEmail('');
             setAccentColor('#8b5cf6');
@@ -199,7 +205,9 @@ const handleSubmit = async () => {
         host_email: hostEmail || 'ayush@example.com',
         description: `Meeting with ${hostName}`, 
         timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-        // availability: availabilitySlots, // Deprecated in favor of schedule_id
+        // availability: availabi,
+        booking_type: bookingType,
+        capacity: bookingType === 'group' ? parseInt(capacity) : 1, // Deprecated in favor of schedule_id
         schedule_id: selectedScheduleId,
         accent_color: accentColor
       };
@@ -381,6 +389,76 @@ const handleSubmit = async () => {
               </div>
             )}
           </div>
+          <div className="border-b border-gray-100">
+            <button 
+              className="w-full flex items-center justify-between p-6 hover:bg-gray-50 transition-colors"
+              onClick={() => toggleSection('bookingType')}
+            >
+              <div className="flex items-center gap-3">
+                 <h3 className="font-bold text-gray-800">Booking Type</h3>
+                 <span className="text-sm font-normal text-gray-500 ml-2">
+                    {bookingType === 'one_on_one' ? 'One-on-One' : `Group (${capacity} seats)`}
+                 </span>
+              </div>
+              {expandedSection === 'bookingType' ? <ChevronUp size={20} className="text-gray-400" /> : <ChevronDown size={20} className="text-gray-400" />}
+            </button>
+
+            {expandedSection === 'bookingType' && (
+              <div className="px-6 pb-6">
+                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
+                    <button
+                        onClick={() => setBookingType('one_on_one')}
+                        className={`flex flex-col items-center justify-center gap-2 p-4 border rounded-lg transition-all hover:shadow-md ${
+                            bookingType === 'one_on_one'
+                            ? 'border-blue-600 bg-blue-50 text-blue-700'
+                            : 'border-gray-200 hover:border-blue-300 text-gray-700'
+                        }`}
+                    >
+                        <User size={24} />
+                        <div className="text-center">
+                            <div className="text-sm font-bold">One-on-One</div>
+                            <div className="text-xs text-gray-500 mt-1">Single invitee per slot</div>
+                        </div>
+                    </button>
+                    <button
+                        onClick={() => setBookingType('group')}
+                        className={`flex flex-col items-center justify-center gap-2 p-4 border rounded-lg transition-all hover:shadow-md ${
+                            bookingType === 'group'
+                            ? 'border-blue-600 bg-blue-50 text-blue-700'
+                            : 'border-gray-200 hover:border-blue-300 text-gray-700'
+                        }`}
+                    >
+                        <div className="flex">
+                            <User size={24} />
+                            <User size={24} className="-ml-3 opacity-70" />
+                        </div>
+                        <div className="text-center">
+                            <div className="text-sm font-bold">Group</div>
+                            <div className="text-xs text-gray-500 mt-1">Multiple invitees per slot</div>
+                        </div>
+                    </button>
+                 </div>
+
+                 {bookingType === 'group' && (
+                     <div className="bg-gray-50 rounded-lg p-4 border border-gray-200 animate-in fade-in slide-in-from-top-2 duration-200">
+                         <label className="block text-xs font-semibold text-gray-500 uppercase mb-2">Maximum Seats per Slot</label>
+                         <div className="flex items-center gap-3">
+                             <input 
+                                type="number" 
+                                min="1"
+                                value={capacity}
+                                onChange={(e) => setCapacity(e.target.value)}
+                                className="w-24 px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                             />
+                             <span className="text-sm text-gray-500">people</span>
+                         </div>
+                     </div>
+                 )}
+              </div>
+            )}
+          </div>
+
+          {/* v>
 
           {/* Location Section */}
           <div className="border-b border-gray-100">

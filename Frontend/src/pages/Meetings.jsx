@@ -209,8 +209,9 @@ const Meetings = () => {
 
                                       {/* Invitee Summary */}
                                       <div className="w-full md:w-1/4 text-sm text-gray-600 font-medium">
-                                          {meeting.booker_name}
-                                          <span className="text-gray-400 font-normal ml-1">(Invitee)</span>
+                                          {meeting.invitees && meeting.invitees.length > 1 
+                                            ? `${meeting.invitees.length} Invitees` 
+                                            : (meeting.invitees?.[0]?.name || 'Unknown')}
                                       </div>
 
                                       {/* Event Type */}
@@ -237,14 +238,6 @@ const Meetings = () => {
                                               <button className="flex items-center gap-2 justify-center w-full py-2 border border-gray-300 text-gray-700 rounded-full text-sm font-medium hover:bg-white transition-colors">
                                                  <Download size={14} /> Export
                                               </button>
-                                              <button 
-                                                onClick={() => handleCancel(meeting.id)}
-                                                className="flex items-center gap-2 justify-center w-full py-2 border border-gray-300 text-gray-700 rounded-full text-sm font-medium hover:bg-white hover:text-red-600 transition-colors"
-                                              >
-                                                 <Trash2 size={14} /> Delete
-                                              </button>
-
-                                              
                                           </div>
 
                                           {/* Right Info Column */}
@@ -270,19 +263,32 @@ const Meetings = () => {
                                               {/* Invitees List */}
                                               <div>
                                                   <h4 className="text-xs font-bold text-gray-500 uppercase mb-4 border-b border-gray-200 pb-2">
-                                                      Invitees
+                                                      Invitees ({meeting.invitees?.length || 0})
                                                   </h4>
-                                                  <div className="flex justify-between items-center py-3 border-b border-gray-100">
-                                                      <div className="flex items-center gap-3">
-                                                           <User size={16} className="text-gray-800" />
-                                                           <span className="font-bold text-sm text-gray-800">{meeting.booker_name}</span>
-                                                      </div>
-                                                      <div className="text-sm text-gray-500 flex items-center gap-2 cursor-pointer hover:text-blue-600">
-                                                          Invitee details <ChevronRightIcon />
-                                                      </div>
-                                                  </div>
-                                                  <div className="text-xs text-gray-400 mt-2">
-                                                      {meeting.booker_email}
+                                                  
+                                                  <div className="space-y-3">
+                                                      {meeting.invitees?.map((invitee) => (
+                                                          <div key={invitee.id} className="flex justify-between items-center py-2 border-b border-gray-100 last:border-0">
+                                                              <div>
+                                                                  <div className="flex items-center gap-3">
+                                                                      <User size={16} className="text-gray-800" />
+                                                                      <span className="font-bold text-sm text-gray-800">{invitee.name}</span>
+                                                                  </div>
+                                                                  <div className="text-xs text-gray-500 mt-1 ml-7">
+                                                                       {invitee.email}
+                                                                  </div>
+                                                              </div>
+                                                              <button 
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    handleCancel(invitee.id);
+                                                                }}
+                                                                className="text-red-500 hover:text-red-700 text-xs font-medium px-3 py-1 border border-red-200 rounded hover:bg-red-50 transition-colors"
+                                                              >
+                                                                  Cancel
+                                                              </button>
+                                                          </div>
+                                                      ))}
                                                   </div>
                                               </div>
                                           </div>

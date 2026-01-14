@@ -42,5 +42,5 @@ INSERT INTO date_overrides (event_type_id, schedule_id, override_date, start_tim
 INSERT INTO date_overrides (event_type_id, schedule_id, override_date, start_time, end_time) VALUES (NULL, 2, '2026-01-08', '16:00:00', '17:00:00');
 
 -- Bookings
-INSERT INTO bookings (id, event_type_id, booker_name, booker_email, start_time, end_time, status, cancellation_reason, rescheduled_from_id, created_at) VALUES (8, 7, 'invite 3', 'invite@gmail.com', '2026-01-13 07:30:00', '2026-01-13 08:30:00', 'confirmed', NULL, NULL, '2026-01-08 10:51:03');
+INSERT INTO bookings (id, event_type_id, booker_name, booker_email, start_time, end_time, status, cancellation_reason, created_at) VALUES (8, 7, 'invite 3', 'invite@gmail.com', '2026-01-13 07:30:00', '2026-01-13 08:30:00', 'confirmed', NULL, '2026-01-08 10:51:03');
 
