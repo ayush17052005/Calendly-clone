@@ -79,6 +79,5 @@ CREATE TABLE bookings (
   status ENUM('confirmed', 'cancelled') DEFAULT 'confirmed',
   cancellation_reason TEXT,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  FOREIGN KEY (event_type_id) REFERENCES event_types(id) ON DELETE CASCADE,
- 
+  FOREIGN KEY (event_type_id) REFERENCES event_types(id) ON DELETE CASCADE
 );
